@@ -1,0 +1,9 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject client.Services.AuthService AuthService
+
+<PageTitle>Feed – GolfCoach</PageTitle>
+
+<h1>Community Feed</h1>
+<p>Welcome, @AuthService.CurrentUser?.DisplayName! Posts and feed coming in Phase 3.</p>

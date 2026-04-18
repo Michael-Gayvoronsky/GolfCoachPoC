@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+
+# .NET
+client/bin/
+client/obj/
+client/*.user
+client/appsettings.*.json
+!client/appsettings.Development.json
+
+# General
+.DS_Store
+*.log
