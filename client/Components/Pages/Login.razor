@@ -1,0 +1,105 @@
+@page "/login"
+@rendermode InteractiveServer
+@inject client.Services.AuthService AuthService
+@inject NavigationManager Nav
+
+<PageTitle>Sign In – GolfCoach</PageTitle>
+
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <h2 class="auth-title">Welcome back</h2>
+        <p class="auth-sub">Sign in to your GolfCoach account</p>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="HandleEmailLogin" class="auth-form">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText @bind-Value="_model.Email" class="form-control" type="email" placeholder="you@example.com" />
+                <ValidationMessage For="() => _model.Email" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText @bind-Value="_model.Password" class="form-control" type="password" placeholder="••••••••" />
+                <ValidationMessage For="() => _model.Password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
+                @(_loading ? "Signing in…" : "Sign In")
+            </button>
+        </EditForm>
+
+        <div class="divider"><span>or</span></div>
+
+        <button class="btn btn-outline-dark w-100" @onclick="HandleGoogleLogin" disabled="@_loading">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" class="me-2" alt="" />
+            Continue with Google
+        </button>
+
+        <p class="auth-footer">Don't have an account? <a href="/signup">Sign up</a></p>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await AuthService.InitializeAsync();
+    }
+
+    private async Task HandleEmailLogin()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            await AuthService.SignInWithEmailAsync(_model.Email, _model.Password);
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message.Contains("INVALID_LOGIN_CREDENTIALS")
+                ? "Invalid email or password."
+                : "Sign in failed. Please try again.";
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task HandleGoogleLogin()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            await AuthService.SignInWithGoogleAsync();
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = "Google sign in failed. Please try again.";
+            Console.Error.WriteLine(ex);
+        }
+        finally { _loading = false; }
+    }
+
+    private class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(6)]
+        public string Password { get; set; } = "";
+    }
+}

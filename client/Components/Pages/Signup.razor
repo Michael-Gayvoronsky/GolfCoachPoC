@@ -1,0 +1,149 @@
+@page "/signup"
+@rendermode InteractiveServer
+@inject client.Services.AuthService AuthService
+@inject NavigationManager Nav
+@using System.Net.Http.Json
+
+<PageTitle>Sign Up – GolfCoach</PageTitle>
+
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <h2 class="auth-title">Join GolfCoach</h2>
+        <p class="auth-sub">Get feedback from the community on your game</p>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="HandleSignup" class="auth-form">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label class="form-label">Display Name</label>
+                <InputText @bind-Value="_model.DisplayName" class="form-control" placeholder="Tiger W." />
+                <ValidationMessage For="() => _model.DisplayName" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Skill Level</label>
+                <InputSelect @bind-Value="_model.SkillLevel" class="form-select">
+                    <option value="BEGINNER">Beginner</option>
+                    <option value="INTERMEDIATE">Intermediate</option>
+                    <option value="EXPERIENCED">Experienced</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText @bind-Value="_model.Email" class="form-control" type="email" placeholder="you@example.com" />
+                <ValidationMessage For="() => _model.Email" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText @bind-Value="_model.Password" class="form-control" type="password" placeholder="Min. 6 characters" />
+                <ValidationMessage For="() => _model.Password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
+                @(_loading ? "Creating account…" : "Create Account")
+            </button>
+        </EditForm>
+
+        <div class="divider"><span>or</span></div>
+
+        <button class="btn btn-outline-dark w-100" @onclick="HandleGoogleSignup" disabled="@_loading">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" class="me-2" alt="" />
+            Continue with Google
+        </button>
+
+        <p class="auth-footer">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
+</div>
+
+@code {
+    [Inject] private IHttpClientFactory HttpFactory { get; set; } = default!;
+
+    private readonly SignupModel _model = new();
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await AuthService.InitializeAsync();
+    }
+
+    private async Task HandleSignup()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var token = await AuthService.SignUpWithEmailAsync(_model.Email, _model.Password);
+            await UpsertUserRecord(token);
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message.Contains("EMAIL_EXISTS")
+                ? "That email is already in use."
+                : "Sign up failed. Please try again.";
+            Console.Error.WriteLine(ex);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task HandleGoogleSignup()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var token = await AuthService.SignInWithGoogleAsync();
+            await UpsertUserRecord(token);
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = "Google sign up failed. Please try again.";
+            Console.Error.WriteLine(ex);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task UpsertUserRecord(string token)
+    {
+        var http = HttpFactory.CreateClient("API");
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var payload = new
+        {
+            display_name = _model.DisplayName,
+            email = _model.Email,
+            skill_level = _model.SkillLevel,
+        };
+
+        var response = await http.PostAsJsonAsync("/api/users/me", payload);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private class SignupModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(2)]
+        public string DisplayName { get; set; } = "";
+
+        public string SkillLevel { get; set; } = "BEGINNER";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(6)]
+        public string Password { get; set; } = "";
+    }
+}
