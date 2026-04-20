@@ -1,0 +1,219 @@
+@page "/upload"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject AuthService AuthService
+@inject IJSRuntime JS
+@inject IHttpClientFactory HttpFactory
+@inject NavigationManager Nav
+@using System.Net.Http.Json
+
+<PageTitle>Upload – GolfCoach</PageTitle>
+
+<div class="upload-wrapper">
+    <div class="upload-card">
+        <h2 class="upload-title">Share Your Swing</h2>
+        <p class="upload-sub">Upload a photo or video and get feedback from the community</p>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        @* Hidden file input — triggered by the drop zone click *@
+        <input type="file"
+               @ref="_fileInput"
+               accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+               style="display:none"
+               @onchange="OnFileSelected" />
+
+        @if (_previewUrl is null)
+        {
+            <div class="drop-zone" @onclick="OpenFilePicker"
+                 @ondragover:preventDefault="true"
+                 @ondrop="OnDrop">
+                <span class="drop-icon">&#x1F4F7;</span>
+                <p>Drag & drop or <strong>click to select</strong></p>
+                <p class="drop-hint">Images up to 10 MB &middot; Videos up to 100 MB</p>
+            </div>
+        }
+        else
+        {
+            <div class="preview-container">
+                @if (_mediaType == "image")
+                {
+                    <img src="@_previewUrl" class="preview-media" alt="preview" />
+                }
+                else
+                {
+                    <video src="@_previewUrl" class="preview-media" controls muted playsinline></video>
+                }
+                <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="ClearFile">
+                    Change file
+                </button>
+            </div>
+        }
+
+        <div class="mt-3">
+            <label class="form-label">Caption <span class="text-muted">(optional)</span></label>
+            <textarea class="form-control"
+                      rows="3"
+                      maxlength="500"
+                      placeholder="Describe your swing or ask a question…"
+                      @bind="_caption"
+                      @bind:event="oninput"></textarea>
+            <div class="char-count text-muted">@_caption.Length / 500</div>
+        </div>
+
+        @if (_uploading)
+        {
+            <div class="mt-3">
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         style="width: @_progress%"
+                         role="progressbar"
+                         aria-valuenow="@_progress"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                        @_progress%
+                    </div>
+                </div>
+            </div>
+        }
+
+        <button class="btn btn-primary w-100 mt-3"
+                disabled="@(_previewUrl is null || _uploading)"
+                @onclick="HandleSubmit">
+            @(_uploading ? "Uploading…" : "Post")
+        </button>
+    </div>
+</div>
+
+@code {
+    private ElementReference _fileInput;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<Upload>? _dotNetRef;
+
+    private string? _previewUrl;
+    private string _caption = "";
+    private string _mediaType = "image";
+    private string _contentType = "";
+    private long _fileSize;
+    private int _progress;
+    private bool _uploading;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/firebase-interop.js");
+            await AuthService.InitializeAsync();
+        }
+    }
+
+    private async Task OpenFilePicker()
+    {
+        await JS.InvokeVoidAsync("eval", "document.querySelector('input[type=file]').click()");
+    }
+
+    private async Task OnFileSelected() => await LoadPreview();
+    private async Task OnDrop() => await LoadPreview();
+
+    private async Task LoadPreview()
+    {
+        _error = null;
+        var info = await _module!.InvokeAsync<FileInfo?>("getFileInfo", _fileInput);
+        if (info is null) return;
+
+        if (!IsAllowedType(info.Type))
+        {
+            _error = "Unsupported file type. Please select an image or video.";
+            return;
+        }
+
+        _contentType = info.Type;
+        _fileSize = info.Size;
+        _mediaType = info.Type.StartsWith("video") ? "video" : "image";
+
+        if (_previewUrl is not null)
+            await _module.InvokeVoidAsync("revokeObjectUrl", _previewUrl);
+
+        _previewUrl = info.PreviewUrl;
+        StateHasChanged();
+    }
+
+    private async Task ClearFile()
+    {
+        if (_previewUrl is not null)
+            await _module!.InvokeVoidAsync("revokeObjectUrl", _previewUrl);
+        _previewUrl = null;
+        _contentType = "";
+        _progress = 0;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _uploading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var mediaUrl = await _module!.InvokeAsync<string>("uploadToStorage", _fileInput, _dotNetRef);
+
+            var token = await AuthService.GetIdTokenAsync();
+            var http = HttpFactory.CreateClient("API");
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var payload = new
+            {
+                caption = string.IsNullOrWhiteSpace(_caption) ? null : _caption.Trim(),
+                media_url = mediaUrl,
+                media_type = _mediaType,
+                file_size = _fileSize,
+                content_type = _contentType,
+            };
+
+            var response = await http.PostAsJsonAsync("/api/posts", payload);
+            response.EnsureSuccessStatusCode();
+
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = "Upload failed. Please try again.";
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnUploadProgress(int pct)
+    {
+        _progress = pct;
+        StateHasChanged();
+    }
+
+    private static bool IsAllowedType(string type) =>
+        type is "image/jpeg" or "image/png" or "image/webp"
+             or "video/mp4" or "video/quicktime" or "video/webm";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            if (_previewUrl is not null)
+                await _module.InvokeVoidAsync("revokeObjectUrl", _previewUrl);
+            await _module.DisposeAsync();
+        }
+        _dotNetRef?.Dispose();
+    }
+
+    private record FileInfo(string Name, string Type, long Size, string PreviewUrl);
+}

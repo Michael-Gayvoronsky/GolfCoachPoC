@@ -37,6 +37,7 @@ public class AuthService : IAsyncDisposable
             authDomain = _config["Firebase:AuthDomain"],
             projectId = _config["Firebase:ProjectId"],
             appId = _config["Firebase:AppId"],
+            storageBucket = _config["Firebase:StorageBucket"],
         };
 
         await _module.InvokeVoidAsync("initializeFirebase", firebaseConfig, _dotNetRef);
