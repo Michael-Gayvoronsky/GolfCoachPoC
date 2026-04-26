@@ -2,16 +2,13 @@ const FIREBASE_VERSION = "10.14.1";
 const BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
 
 let auth = null;
-let storage = null;
 
 export async function initializeFirebase(config, dotNetRef) {
     const { initializeApp } = await import(`${BASE}/firebase-app.js`);
     const { getAuth, onAuthStateChanged } = await import(`${BASE}/firebase-auth.js`);
-    const { getStorage } = await import(`${BASE}/firebase-storage.js`);
 
     const app = initializeApp(config);
     auth = getAuth(app);
-    storage = getStorage(app);
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -73,24 +70,34 @@ export function revokeObjectUrl(url) {
     URL.revokeObjectURL(url);
 }
 
-// Uploads the selected file to Firebase Storage and returns the public download URL.
+// Uploads the selected file to Cloudinary and returns the secure CDN URL.
 // Calls dotNetRef.OnUploadProgress(pct) during upload.
-export async function uploadToStorage(inputEl, dotNetRef) {
-    const { ref, uploadBytesResumable, getDownloadURL } = await import(`${BASE}/firebase-storage.js`);
-    const file = inputEl.files[0];
-    const path = `media/${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, path);
-
+export function uploadToCloudinary(inputEl, cloudName, uploadPreset, dotNetRef) {
     return new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(storageRef, file);
-        task.on(
-            "state_changed",
-            snapshot => {
-                const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        const file = inputEl.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", uploadPreset);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`);
+
+        xhr.upload.addEventListener("progress", e => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
                 dotNetRef.invokeMethodAsync("OnUploadProgress", pct);
-            },
-            err => reject(err.message),
-            async () => resolve(await getDownloadURL(task.snapshot.ref))
-        );
+            }
+        });
+
+        xhr.addEventListener("load", () => {
+            if (xhr.status === 200) {
+                resolve(JSON.parse(xhr.responseText).secure_url);
+            } else {
+                reject(xhr.responseText);
+            }
+        });
+
+        xhr.addEventListener("error", () => reject("Upload failed"));
+        xhr.send(formData);
     });
 }
