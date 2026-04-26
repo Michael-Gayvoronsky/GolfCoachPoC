@@ -137,7 +137,7 @@
         _fileSize = info.Size;
         _mediaType = info.Type.StartsWith("video") ? "video" : "image";
 
-        if (_previewUrl is not null)
+        if (_previewUrl is not null && _module is not null)
             await _module.InvokeVoidAsync("revokeObjectUrl", _previewUrl);
 
         _previewUrl = info.PreviewUrl;
