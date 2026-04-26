@@ -1,0 +1,75 @@
+@page "/post/{PostId}"
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpFactory
+@inject NavigationManager Nav
+@using System.Net.Http.Json
+
+<PageTitle>Post – GolfCoach</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading">Loading post…</div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_post is not null)
+{
+    <div class="post-detail">
+        <div class="post-detail-media">
+            @if (_post.MediaType == "image")
+            {
+                <img src="@_post.MediaUrl" alt="@_post.Caption" />
+            }
+            else
+            {
+                <video src="@_post.MediaUrl" controls playsinline></video>
+            }
+        </div>
+
+        <div class="post-detail-info">
+            <div class="post-author">
+                <span class="author-name">@_post.Author.DisplayName</span>
+                <span class="skill-badge skill-@_post.Author.SkillLevel.ToLower()">
+                    @_post.Author.SkillLevel
+                </span>
+            </div>
+            @if (!string.IsNullOrEmpty(_post.Caption))
+            {
+                <p class="post-caption">@_post.Caption</p>
+            }
+        </div>
+
+        <div class="comments-section">
+            <h3>Comments</h3>
+            <p class="text-muted">Comments and upvoting coming in Phase 4.</p>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string PostId { get; set; } = "";
+
+    private PostDetailDto? _post;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var http = HttpFactory.CreateClient("API");
+            _post = await http.GetFromJsonAsync<PostDetailDto>($"/api/posts/{PostId}");
+        }
+        catch
+        {
+            _error = "Could not load post.";
+        }
+        finally { _loading = false; }
+    }
+
+    private record AuthorDto(string DisplayName, string SkillLevel);
+    private record PostDetailDto(
+        string Id, string? Caption, string MediaUrl, string MediaType, AuthorDto Author);
+}
