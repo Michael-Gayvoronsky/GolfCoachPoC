@@ -1,0 +1,50 @@
+@inject NavigationManager Nav
+
+<div class="post-card" @onclick="GoToPost">
+    <div class="post-card-media">
+        @if (Post.MediaType == "image")
+        {
+            <img src="@Post.MediaUrl" alt="@Post.Caption" loading="lazy" />
+        }
+        else
+        {
+            <div class="video-thumb">
+                <span class="play-icon">&#x25B6;</span>
+            </div>
+        }
+    </div>
+
+    <div class="post-card-body">
+        <div class="post-card-author">
+            <span class="author-name">@Post.AuthorName</span>
+            <span class="skill-badge skill-@Post.SkillLevel.ToLower()">@Post.SkillLevel</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Post.Caption))
+        {
+            <p class="post-card-caption">
+                @(Post.Caption.Length > 80 ? Post.Caption[..80] + "…" : Post.Caption)
+            </p>
+        }
+
+        <div class="post-card-meta">
+            <span>&#x1F4AC; @Post.CommentCount</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PostCardModel Post { get; set; } = default!;
+
+    private void GoToPost() => Nav.NavigateTo($"/post/{Post.Id}");
+
+    public record PostCardModel(
+        string Id,
+        string? Caption,
+        string MediaUrl,
+        string MediaType,
+        string AuthorName,
+        string SkillLevel,
+        int CommentCount
+    );
+}

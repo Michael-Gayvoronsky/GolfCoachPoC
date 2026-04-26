@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 @inject IHttpClientFactory HttpFactory
 @inject NavigationManager Nav
+@inject IConfiguration Config
 @using System.Net.Http.Json
 
 <PageTitle>Upload – GolfCoach</PageTitle>
@@ -160,7 +161,10 @@
 
         try
         {
-            var mediaUrl = await _module!.InvokeAsync<string>("uploadToStorage", _fileInput, _dotNetRef);
+            var cloudName = Config["Cloudinary:CloudName"];
+            var uploadPreset = Config["Cloudinary:UploadPreset"];
+            var mediaUrl = await _module!.InvokeAsync<string>(
+                "uploadToCloudinary", _fileInput, cloudName, uploadPreset, _dotNetRef);
 
             var token = await AuthService.GetIdTokenAsync();
             var http = HttpFactory.CreateClient("API");

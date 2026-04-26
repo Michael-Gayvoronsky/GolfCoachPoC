@@ -1,9 +1,91 @@
 ﻿@page "/"
 @rendermode InteractiveServer
-@attribute [Authorize]
-@inject client.Services.AuthService AuthService
+@inject IHttpClientFactory HttpFactory
+@using System.Net.Http.Json
+@using client.Components.Posts
 
 <PageTitle>Feed – GolfCoach</PageTitle>
 
-<h1>Community Feed</h1>
-<p>Welcome, @AuthService.CurrentUser?.DisplayName! Posts and feed coming in Phase 3.</p>
+<div class="feed-header">
+    <h1>Community Feed</h1>
+    <p class="text-muted">See what the community is working on</p>
+</div>
+
+@if (_loading && !_posts.Any())
+{
+    <div class="loading">Loading feed…</div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (!_posts.Any())
+{
+    <div class="feed-empty">
+        <p>No posts yet. Be the first to share your swing!</p>
+        <a href="/upload" class="btn btn-primary">Post a Swing</a>
+    </div>
+}
+else
+{
+    <div class="post-grid">
+        @foreach (var post in _posts)
+        {
+            <PostCard Post="post" />
+        }
+    </div>
+
+    @if (_hasMore)
+    {
+        <div class="load-more">
+            <button class="btn btn-outline-primary" @onclick="LoadMore" disabled="@_loading">
+                @(_loading ? "Loading…" : "Load More")
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private readonly List<PostCard.PostCardModel> _posts = [];
+    private bool _loading = true;
+    private bool _hasMore = true;
+    private string? _error;
+    private int _skip = 0;
+    private const int Limit = 12;
+
+    protected override async Task OnInitializedAsync() => await LoadMore();
+
+    private async Task LoadMore()
+    {
+        _loading = true;
+        try
+        {
+            var http = HttpFactory.CreateClient("API");
+            var batch = await http.GetFromJsonAsync<List<PostSummaryDto>>(
+                $"/api/posts?skip={_skip}&limit={Limit}");
+
+            if (batch is null || batch.Count == 0)
+            {
+                _hasMore = false;
+                return;
+            }
+
+            _posts.AddRange(batch.Select(p => new PostCard.PostCardModel(
+                p.Id, p.Caption, p.MediaUrl, p.MediaType,
+                p.Author.DisplayName, p.Author.SkillLevel, p.CommentCount)));
+
+            _skip += batch.Count;
+            _hasMore = batch.Count == Limit;
+        }
+        catch
+        {
+            _error = "Could not load feed.";
+        }
+        finally { _loading = false; }
+    }
+
+    private record AuthorDto(string DisplayName, string SkillLevel);
+    private record PostSummaryDto(
+        string Id, string? Caption, string MediaUrl, string MediaType,
+        AuthorDto Author, int CommentCount);
+}
