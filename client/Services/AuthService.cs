@@ -12,6 +12,7 @@ public class AuthService : IAsyncDisposable
     private readonly IConfiguration _config;
     private IJSObjectReference? _module;
     private DotNetObjectReference<AuthService>? _dotNetRef;
+    private Task? _initTask;
 
     public UserInfo? CurrentUser { get; private set; }
     public string? IdToken { get; private set; }
@@ -24,10 +25,10 @@ public class AuthService : IAsyncDisposable
         _config = config;
     }
 
-    public async Task InitializeAsync()
-    {
-        if (_module != null) return;
+    public Task InitializeAsync() => _initTask ??= InitializeCoreAsync();
 
+    private async Task InitializeCoreAsync()
+    {
         _module = await _js.InvokeAsync<IJSObjectReference>("import", "./js/firebase-interop.js");
         _dotNetRef = DotNetObjectReference.Create(this);
 

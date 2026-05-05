@@ -1,57 +1,39 @@
-const FIREBASE_VERSION = "10.14.1";
-const BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+// MOCK MODE — real Firebase/Cloudinary credentials not required
+// To restore real auth, replace the top section with the original Firebase SDK calls.
 
-let auth = null;
+let _dotNetRef = null;
+let _mockToken = null;
 
 export async function initializeFirebase(config, dotNetRef) {
-    const { initializeApp } = await import(`${BASE}/firebase-app.js`);
-    const { getAuth, onAuthStateChanged } = await import(`${BASE}/firebase-auth.js`);
-
-    const app = initializeApp(config);
-    auth = getAuth(app);
-
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            const token = await user.getIdToken();
-            await dotNetRef.invokeMethodAsync("OnAuthStateChanged", {
-                uid: user.uid,
-                email: user.email ?? "",
-                displayName: user.displayName ?? "",
-                token,
-            });
-        } else {
-            await dotNetRef.invokeMethodAsync("OnAuthStateChanged", null);
-        }
-    });
+    _dotNetRef = dotNetRef;
+    await dotNetRef.invokeMethodAsync("OnAuthStateChanged", null);
 }
 
-export async function signInWithEmail(email, password) {
-    const { signInWithEmailAndPassword } = await import(`${BASE}/firebase-auth.js`);
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return await result.user.getIdToken();
+export async function signInWithEmail(email, _password) {
+    _mockToken = "mock-token-" + Date.now();
+    const user = { uid: "mock-uid", email, displayName: email.split("@")[0], token: _mockToken };
+    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", user);
+    return _mockToken;
 }
 
-export async function signUpWithEmail(email, password) {
-    const { createUserWithEmailAndPassword } = await import(`${BASE}/firebase-auth.js`);
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return await result.user.getIdToken();
+export async function signUpWithEmail(email, _password) {
+    return signInWithEmail(email, _password);
 }
 
 export async function signInWithGoogle() {
-    const { signInWithPopup, GoogleAuthProvider } = await import(`${BASE}/firebase-auth.js`);
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return await result.user.getIdToken();
+    _mockToken = "mock-google-token-" + Date.now();
+    const user = { uid: "mock-google-uid", email: "demo@example.com", displayName: "Demo User", token: _mockToken };
+    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", user);
+    return _mockToken;
 }
 
 export async function firebaseSignOut() {
-    const { signOut } = await import(`${BASE}/firebase-auth.js`);
-    await signOut(auth);
+    _mockToken = null;
+    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", null);
 }
 
 export async function getIdToken() {
-    if (!auth?.currentUser) return null;
-    return await auth.currentUser.getIdToken(true);
+    return _mockToken;
 }
 
 // Returns { name, type, size, previewUrl } for the selected file, or null
@@ -70,34 +52,17 @@ export function revokeObjectUrl(url) {
     URL.revokeObjectURL(url);
 }
 
-// Uploads the selected file to Cloudinary and returns the secure CDN URL.
-// Calls dotNetRef.OnUploadProgress(pct) during upload.
+// MOCK upload — returns a placeholder image URL instead of uploading to Cloudinary
 export function uploadToCloudinary(inputEl, cloudName, uploadPreset, dotNetRef) {
-    return new Promise((resolve, reject) => {
-        const file = inputEl.files[0];
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", uploadPreset);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`);
-
-        xhr.upload.addEventListener("progress", e => {
-            if (e.lengthComputable) {
-                const pct = Math.round((e.loaded / e.total) * 100);
-                dotNetRef.invokeMethodAsync("OnUploadProgress", pct);
+    return new Promise((resolve) => {
+        let pct = 0;
+        const interval = setInterval(() => {
+            pct = Math.min(pct + 20, 100);
+            dotNetRef.invokeMethodAsync("OnUploadProgress", pct);
+            if (pct === 100) {
+                clearInterval(interval);
+                resolve("https://placehold.co/640x360?text=Media+Placeholder");
             }
-        });
-
-        xhr.addEventListener("load", () => {
-            if (xhr.status === 200) {
-                resolve(JSON.parse(xhr.responseText).secure_url);
-            } else {
-                reject(xhr.responseText);
-            }
-        });
-
-        xhr.addEventListener("error", () => reject("Upload failed"));
-        xhr.send(formData);
+        }, 150);
     });
 }

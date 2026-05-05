@@ -16,7 +16,7 @@
             <div class="alert alert-danger">@_error</div>
         }
 
-        <EditForm Model="_model" OnValidSubmit="HandleSignup" class="auth-form">
+        <EditForm Model="_model" OnValidSubmit="HandleSignup" class="auth-form" FormName="signup">
             <DataAnnotationsValidator />
 
             <div class="mb-3">
@@ -115,19 +115,27 @@
 
     private async Task UpsertUserRecord(string token)
     {
-        var http = HttpFactory.CreateClient("API");
-        http.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-        var payload = new
+        try
         {
-            display_name = _model.DisplayName,
-            email = _model.Email,
-            skill_level = _model.SkillLevel,
-        };
+            var http = HttpFactory.CreateClient("API");
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        var response = await http.PostAsJsonAsync("/api/users/me", payload);
-        response.EnsureSuccessStatusCode();
+            var payload = new
+            {
+                display_name = _model.DisplayName,
+                email = _model.Email,
+                skill_level = _model.SkillLevel,
+            };
+
+            var response = await http.PostAsJsonAsync("/api/users/me", payload);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            // Backend unavailable in mock mode — continue anyway
+            Console.WriteLine($"[mock] UpsertUserRecord skipped: {ex.Message}");
+        }
     }
 
     private class SignupModel
