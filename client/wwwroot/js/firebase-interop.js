@@ -1,35 +1,29 @@
 // MOCK MODE — real Firebase/Cloudinary credentials not required
-// To restore real auth, replace the top section with the original Firebase SDK calls.
+// To restore real auth, replace this section with the original Firebase SDK calls.
 
-let _dotNetRef = null;
 let _mockToken = null;
 
-export async function initializeFirebase(config, dotNetRef) {
-    _dotNetRef = dotNetRef;
-    await dotNetRef.invokeMethodAsync("OnAuthStateChanged", null);
+export async function initializeFirebase(_config, _dotNetRef) {
+    // no-op: C# handles initial signed-out state by default
 }
 
-export async function signInWithEmail(email, _password) {
+export async function signInWithEmail(_email, _password) {
     _mockToken = "mock-token-" + Date.now();
-    const user = { uid: "mock-uid", email, displayName: email.split("@")[0], token: _mockToken };
-    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", user);
     return _mockToken;
 }
 
-export async function signUpWithEmail(email, _password) {
-    return signInWithEmail(email, _password);
+export async function signUpWithEmail(_email, _password) {
+    _mockToken = "mock-token-" + Date.now();
+    return _mockToken;
 }
 
 export async function signInWithGoogle() {
     _mockToken = "mock-google-token-" + Date.now();
-    const user = { uid: "mock-google-uid", email: "demo@example.com", displayName: "Demo User", token: _mockToken };
-    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", user);
     return _mockToken;
 }
 
 export async function firebaseSignOut() {
     _mockToken = null;
-    if (_dotNetRef) await _dotNetRef.invokeMethodAsync("OnAuthStateChanged", null);
 }
 
 export async function getIdToken() {
@@ -53,7 +47,7 @@ export function revokeObjectUrl(url) {
 }
 
 // MOCK upload — returns a placeholder image URL instead of uploading to Cloudinary
-export function uploadToCloudinary(inputEl, cloudName, uploadPreset, dotNetRef) {
+export function uploadToCloudinary(_inputEl, _cloudName, _uploadPreset, dotNetRef) {
     return new Promise((resolve) => {
         let pct = 0;
         const interval = setInterval(() => {
