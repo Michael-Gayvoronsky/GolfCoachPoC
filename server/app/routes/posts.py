@@ -6,7 +6,7 @@ from datetime import datetime
 from cuid2 import cuid_wrapper
 from app.database import get_db
 from app.middleware.auth import get_current_uid
-from app.models.user import User, SkillLevel
+from app.models.user import SkillLevel
 from app.models.post import Post
 from app.models.comment import Comment
 
@@ -128,13 +128,9 @@ def create_post(
     else:
         raise HTTPException(400, f"Unsupported file type: {body.content_type}")
 
-    user = db.query(User).filter(User.firebase_uid == uid).first()
-    if user is None:
-        raise HTTPException(404, "User not found — complete signup first")
-
     post = Post(
         id=cuid(),
-        author_id=user.id,
+        author_id=uid,
         caption=body.caption or None,
         media_url=body.media_url,
         media_type=media_type,
@@ -151,11 +147,10 @@ def delete_post(
     uid: str = Depends(get_current_uid),
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.firebase_uid == uid).first()
     post = db.query(Post).filter(Post.id == post_id).first()
     if post is None:
         raise HTTPException(404, "Post not found")
-    if post.author_id != user.id:
+    if post.author_id != uid:
         raise HTTPException(403, "Not your post")
     db.delete(post)
     db.commit()

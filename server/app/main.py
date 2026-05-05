@@ -1,17 +1,27 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import users, posts
+from app.database import Base, engine
+from app.routes import auth, users, posts
+import app.models  # noqa: ensures all models are registered before create_all
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="GolfCoach API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5000", "http://localhost:5001", "https://localhost:7001"],
+    allow_origins=[
+        "http://localhost:5271",
+        "https://localhost:7039",
+        "http://localhost:5000",
+        "http://localhost:5001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(posts.router)
 
