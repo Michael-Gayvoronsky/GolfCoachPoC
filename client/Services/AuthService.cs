@@ -63,6 +63,11 @@ public class AuthService : IAsyncDisposable
     {
         var token = await _module!.InvokeAsync<string>("signInWithEmail", email, password);
         IdToken = token;
+        if (CurrentUser is null)
+        {
+            CurrentUser = new UserInfo("uid", email, email.Split('@')[0]);
+            AuthStateChanged?.Invoke();
+        }
         return token;
     }
 
@@ -70,6 +75,11 @@ public class AuthService : IAsyncDisposable
     {
         var token = await _module!.InvokeAsync<string>("signUpWithEmail", email, password);
         IdToken = token;
+        if (CurrentUser is null)
+        {
+            CurrentUser = new UserInfo("uid", email, email.Split('@')[0]);
+            AuthStateChanged?.Invoke();
+        }
         return token;
     }
 
@@ -77,6 +87,11 @@ public class AuthService : IAsyncDisposable
     {
         var token = await _module!.InvokeAsync<string>("signInWithGoogle");
         IdToken = token;
+        if (CurrentUser is null)
+        {
+            CurrentUser = new UserInfo("google-uid", "demo@example.com", "Demo User");
+            AuthStateChanged?.Invoke();
+        }
         return token;
     }
 
