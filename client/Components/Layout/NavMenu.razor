@@ -43,13 +43,11 @@
 </div>
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-        {
-            await AuthService.InitializeAsync();
             AuthService.AuthStateChanged += () => InvokeAsync(StateHasChanged);
-        }
+        return Task.CompletedTask;
     }
 
     private async Task HandleSignOut()

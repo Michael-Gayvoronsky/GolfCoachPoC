@@ -15,7 +15,7 @@
             <div class="alert alert-danger">@_error</div>
         }
 
-        <EditForm Model="_model" OnValidSubmit="HandleEmailLogin" class="auth-form" FormName="login">
+        <EditForm Model="_model" OnValidSubmit="HandleLogin" class="auth-form" FormName="login">
             <DataAnnotationsValidator />
 
             <div class="mb-3">
@@ -35,13 +35,6 @@
             </button>
         </EditForm>
 
-        <div class="divider"><span>or</span></div>
-
-        <button class="btn btn-outline-dark w-100" @onclick="HandleGoogleLogin" disabled="@_loading">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" class="me-2" alt="" />
-            Continue with Google
-        </button>
-
         <p class="auth-footer">Don't have an account? <a href="/signup">Sign up</a></p>
     </div>
 </div>
@@ -51,43 +44,18 @@
     private bool _loading;
     private string? _error;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-            await AuthService.InitializeAsync();
-    }
-
-    private async Task HandleEmailLogin()
+    private async Task HandleLogin()
     {
         _loading = true;
         _error = null;
         try
         {
-            await AuthService.SignInWithEmailAsync(_model.Email, _model.Password);
+            await AuthService.SignInAsync(_model.Email, _model.Password);
             Nav.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            _error = ex.Message.Contains("INVALID_LOGIN_CREDENTIALS")
-                ? "Invalid email or password."
-                : "Sign in failed. Please try again.";
-        }
-        finally { _loading = false; }
-    }
-
-    private async Task HandleGoogleLogin()
-    {
-        _loading = true;
-        _error = null;
-        try
-        {
-            await AuthService.SignInWithGoogleAsync();
-            Nav.NavigateTo("/");
-        }
-        catch (Exception ex)
-        {
-            _error = "Google sign in failed. Please try again.";
-            Console.Error.WriteLine(ex);
+            _error = ex.Message.Contains("Invalid") ? "Invalid email or password." : "Sign in failed. Please try again.";
         }
         finally { _loading = false; }
     }

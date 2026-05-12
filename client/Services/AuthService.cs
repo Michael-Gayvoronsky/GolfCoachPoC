@@ -1,118 +1,88 @@
-using Microsoft.JSInterop;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 
 namespace client.Services;
 
-public record FirebaseUserDto(string Uid, string Email, string DisplayName, string Token);
+public record UserInfo(string Id, string Email, string DisplayName);
 
-public record UserInfo(string Uid, string Email, string DisplayName);
-
-public class AuthService : IAsyncDisposable
+public class AuthService
 {
-    private readonly IJSRuntime _js;
-    private readonly IConfiguration _config;
-    private IJSObjectReference? _module;
-    private DotNetObjectReference<AuthService>? _dotNetRef;
-    private Task? _initTask;
+    private readonly IHttpClientFactory _httpFactory;
 
     public UserInfo? CurrentUser { get; private set; }
     public string? IdToken { get; private set; }
 
     public event Action? AuthStateChanged;
 
-    public AuthService(IJSRuntime js, IConfiguration config)
+    public AuthService(IHttpClientFactory httpFactory)
     {
-        _js = js;
-        _config = config;
+        _httpFactory = httpFactory;
     }
 
-    public Task InitializeAsync() => _initTask ??= InitializeCoreAsync();
+    public Task InitializeAsync() => Task.CompletedTask;
 
-    private async Task InitializeCoreAsync()
+    public async Task SignUpAsync(string email, string password, string displayName, string skillLevel)
     {
-        _module = await _js.InvokeAsync<IJSObjectReference>("import", "./js/firebase-interop.js");
-        _dotNetRef = DotNetObjectReference.Create(this);
-
-        var firebaseConfig = new
+        var http = _httpFactory.CreateClient("API");
+        var response = await http.PostAsJsonAsync("/api/auth/signup", new
         {
-            apiKey = _config["Firebase:ApiKey"],
-            authDomain = _config["Firebase:AuthDomain"],
-            projectId = _config["Firebase:ProjectId"],
-            appId = _config["Firebase:AppId"],
-        };
+            email,
+            password,
+            display_name = displayName,
+            skill_level = skillLevel,
+        });
 
-        await _module.InvokeVoidAsync("initializeFirebase", firebaseConfig, _dotNetRef);
-    }
-
-    [JSInvokable]
-    public void OnAuthStateChanged(FirebaseUserDto? user)
-    {
-        if (user is not null)
+        if (!response.IsSuccessStatusCode)
         {
-            CurrentUser = new UserInfo(user.Uid, user.Email, user.DisplayName);
-            IdToken = user.Token;
+            var err = await response.Content.ReadFromJsonAsync<ApiError>();
+            throw new Exception(err?.Detail ?? "Sign up failed");
         }
-        else
-        {
-            CurrentUser = null;
-            IdToken = null;
-        }
-        AuthStateChanged?.Invoke();
+
+        var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        SetUser(result!);
     }
 
-    public async Task<string> SignInWithEmailAsync(string email, string password)
+    public async Task SignInAsync(string email, string password)
     {
-        var token = await _module!.InvokeAsync<string>("signInWithEmail", email, password);
-        IdToken = token;
-        if (CurrentUser is null)
+        var http = _httpFactory.CreateClient("API");
+        var response = await http.PostAsJsonAsync("/api/auth/login", new { email, password });
+
+        if (!response.IsSuccessStatusCode)
         {
-            CurrentUser = new UserInfo("uid", email, email.Split('@')[0]);
-            AuthStateChanged?.Invoke();
+            var err = await response.Content.ReadFromJsonAsync<ApiError>();
+            throw new Exception(err?.Detail ?? "Sign in failed");
         }
-        return token;
+
+        var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        SetUser(result!);
     }
 
-    public async Task<string> SignUpWithEmailAsync(string email, string password)
+    public Task SignOutAsync()
     {
-        var token = await _module!.InvokeAsync<string>("signUpWithEmail", email, password);
-        IdToken = token;
-        if (CurrentUser is null)
-        {
-            CurrentUser = new UserInfo("uid", email, email.Split('@')[0]);
-            AuthStateChanged?.Invoke();
-        }
-        return token;
-    }
-
-    public async Task<string> SignInWithGoogleAsync()
-    {
-        var token = await _module!.InvokeAsync<string>("signInWithGoogle");
-        IdToken = token;
-        if (CurrentUser is null)
-        {
-            CurrentUser = new UserInfo("google-uid", "demo@example.com", "Demo User");
-            AuthStateChanged?.Invoke();
-        }
-        return token;
-    }
-
-    public async Task SignOutAsync()
-    {
-        await _module!.InvokeVoidAsync("firebaseSignOut");
         CurrentUser = null;
         IdToken = null;
         AuthStateChanged?.Invoke();
+        return Task.CompletedTask;
     }
 
-    public async Task<string?> GetIdTokenAsync()
+    public Task<string?> GetIdTokenAsync() => Task.FromResult(IdToken);
+
+    private void SetUser(AuthResponse r)
     {
-        if (_module is null) return null;
-        return await _module.InvokeAsync<string?>("getIdToken");
+        CurrentUser = new UserInfo(r.UserId, r.Email, r.DisplayName);
+        IdToken = r.Token;
+        AuthStateChanged?.Invoke();
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        _dotNetRef?.Dispose();
-        if (_module is not null)
-            await _module.DisposeAsync();
-    }
+    private record AuthResponse(
+        [property: JsonPropertyName("token")] string Token,
+        [property: JsonPropertyName("user_id")] string UserId,
+        [property: JsonPropertyName("email")] string Email,
+        [property: JsonPropertyName("display_name")] string DisplayName,
+        [property: JsonPropertyName("skill_level")] string SkillLevel
+    );
+
+    private record ApiError(
+        [property: JsonPropertyName("detail")] string Detail
+    );
 }

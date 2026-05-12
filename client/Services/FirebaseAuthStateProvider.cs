@@ -19,7 +19,7 @@ public class FirebaseAuthStateProvider : AuthenticationStateProvider
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Uid),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Name, string.IsNullOrEmpty(user.DisplayName) ? user.Email : user.DisplayName),
             };
