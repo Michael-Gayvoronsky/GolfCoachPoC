@@ -1,91 +1,117 @@
-﻿@page "/"
-@rendermode InteractiveServer
-@inject IHttpClientFactory HttpFactory
-@using System.Net.Http.Json
-@using client.Components.Posts
+@page "/"
+@attribute [AllowAnonymous]
+@layout client.Components.Layout.LandingLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 
-<PageTitle>Feed – GolfCoach</PageTitle>
-
-<div class="feed-header">
-    <h1>Community Feed</h1>
-    <p class="text-muted">See what the community is working on</p>
-</div>
-
-@if (_loading && !_posts.Any())
-{
-    <div class="loading">Loading feed…</div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else if (!_posts.Any())
-{
-    <div class="feed-empty">
-        <p>No posts yet. Be the first to share your swing!</p>
-        <a href="/upload" class="btn btn-primary">Post a Swing</a>
+<nav class="landing-nav">
+    <a class="landing-logo" href="/">⛳ GolfCoach</a>
+    <div class="landing-nav-actions">
+        <a href="/login" class="landing-btn-ghost">Sign In</a>
+        <a href="/signup" class="landing-btn-cta">Get Started Free</a>
     </div>
-}
-else
-{
-    <div class="post-grid">
-        @foreach (var post in _posts)
-        {
-            <PostCard Post="post" />
-        }
-    </div>
+</nav>
 
-    @if (_hasMore)
-    {
-        <div class="load-more">
-            <button class="btn btn-outline-primary" @onclick="LoadMore" disabled="@_loading">
-                @(_loading ? "Loading…" : "Load More")
-            </button>
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-badge">⛳ Community Golf Coaching</div>
+        <h1 class="hero-title">
+            Get Real Feedback<br />
+            <span class="hero-accent">On Your Game</span>
+        </h1>
+        <p class="hero-sub">
+            Upload your swing, share your technique, and get honest insights
+            from a community of golfers at every skill level.
+        </p>
+        <div class="hero-actions">
+            <a href="/signup" class="hero-btn-primary">Start for Free</a>
+            <a href="/login" class="hero-btn-secondary">Sign In</a>
         </div>
-    }
-}
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <span class="hero-stat-number">500+</span>
+                <span class="hero-stat-label">Swings Shared</span>
+            </div>
+            <div class="hero-stat-divider"></div>
+            <div class="hero-stat">
+                <span class="hero-stat-number">200+</span>
+                <span class="hero-stat-label">Golfers</span>
+            </div>
+            <div class="hero-stat-divider"></div>
+            <div class="hero-stat">
+                <span class="hero-stat-number">1,000+</span>
+                <span class="hero-stat-label">Tips Given</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-features">
+    <div class="lp-section-inner">
+        <p class="lp-section-tag">FEATURES</p>
+        <h2 class="lp-section-title">Everything you need to improve</h2>
+        <div class="lp-features-grid">
+            <div class="lp-feature-card">
+                <div class="lp-feature-icon">📹</div>
+                <h3>Share Your Swing</h3>
+                <p>Upload photos or videos of your technique for the community to review and critique.</p>
+            </div>
+            <div class="lp-feature-card">
+                <div class="lp-feature-icon">💬</div>
+                <h3>Get Coaching Tips</h3>
+                <p>Receive detailed comments and actionable advice from experienced golfers who've been there.</p>
+            </div>
+            <div class="lp-feature-card">
+                <div class="lp-feature-icon">🏆</div>
+                <h3>Best Advice Surfaces</h3>
+                <p>The top tips get upvoted and pinned with medals so you never miss the most valuable feedback.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-how">
+    <div class="lp-section-inner">
+        <p class="lp-section-tag">HOW IT WORKS</p>
+        <h2 class="lp-section-title">Three steps to a better swing</h2>
+        <div class="lp-steps">
+            <div class="lp-step">
+                <div class="lp-step-number">01</div>
+                <h3>Create Your Profile</h3>
+                <p>Sign up free and set your skill level — beginner, intermediate, or experienced.</p>
+            </div>
+            <div class="lp-step">
+                <div class="lp-step-number">02</div>
+                <h3>Upload Your Swing</h3>
+                <p>Share a photo or video of any shot — full swing, chip, putt, doesn't matter.</p>
+            </div>
+            <div class="lp-step">
+                <div class="lp-step-number">03</div>
+                <h3>Get Better</h3>
+                <p>Read community tips, upvote the best advice, and apply it on the course.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-cta">
+    <div class="lp-cta-inner">
+        <h2>Ready to lower your handicap?</h2>
+        <p>Join golfers sharing their swings and improving together — completely free.</p>
+        <a href="/signup" class="hero-btn-primary lp-cta-btn">Create Free Account</a>
+    </div>
+</section>
+
+<footer class="landing-footer">
+    <span>© 2026 GolfCoach — Built for golfers, by golfers.</span>
+</footer>
 
 @code {
-    private readonly List<PostCard.PostCardModel> _posts = [];
-    private bool _loading = true;
-    private bool _hasMore = true;
-    private string? _error;
-    private int _skip = 0;
-    private const int Limit = 12;
-
-    protected override async Task OnInitializedAsync() => await LoadMore();
-
-    private async Task LoadMore()
+    protected override async Task OnInitializedAsync()
     {
-        _loading = true;
-        try
-        {
-            var http = HttpFactory.CreateClient("API");
-            var batch = await http.GetFromJsonAsync<List<PostSummaryDto>>(
-                $"/api/posts?skip={_skip}&limit={Limit}");
-
-            if (batch is null || batch.Count == 0)
-            {
-                _hasMore = false;
-                return;
-            }
-
-            _posts.AddRange(batch.Select(p => new PostCard.PostCardModel(
-                p.Id, p.Caption, p.MediaUrl, p.MediaType,
-                p.Author.DisplayName, p.Author.SkillLevel, p.CommentCount)));
-
-            _skip += batch.Count;
-            _hasMore = batch.Count == Limit;
-        }
-        catch
-        {
-            _error = "Could not load feed.";
-        }
-        finally { _loading = false; }
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/feed");
     }
-
-    private record AuthorDto(string DisplayName, string SkillLevel);
-    private record PostSummaryDto(
-        string Id, string? Caption, string MediaUrl, string MediaType,
-        AuthorDto Author, int CommentCount);
 }
