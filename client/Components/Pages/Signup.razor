@@ -1,5 +1,5 @@
 @page "/signup"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject client.Services.AuthService AuthService
 @inject NavigationManager Nav
 
