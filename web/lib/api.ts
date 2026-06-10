@@ -4,6 +4,9 @@ export type SkillLevel = "BEGINNER" | "INTERMEDIATE" | "EXPERIENCED";
 export type AuthUser = { token: string; userId: string; email: string; displayName: string; skillLevel: SkillLevel };
 export type Author = { id: string; displayName: string; skillLevel: SkillLevel; avatarUrl: string | null };
 export type Post = { id: string; caption: string | null; mediaUrl: string; mediaType: string; createdAt: string; author: Author };
+export type PostDetail = Post & { likeCount: number; commentCount: number; isLikedByMe: boolean };
+export type Comment = { id: string; userId: string; displayName: string; avatarUrl: string | null; content: string; createdAt: string };
+export type UserProfile = { id: string; displayName: string; skillLevel: SkillLevel; avatarUrl: string | null; bio: string | null; postCount: number; followerCount: number; followingCount: number; totalLikes: number; isFollowedByMe: boolean };
 
 export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;

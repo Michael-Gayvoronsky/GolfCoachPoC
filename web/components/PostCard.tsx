@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Post } from "@/lib/api";
+import type { PostDetail } from "@/lib/api";
 
 const skillColors: Record<string, string> = {
   BEGINNER: "bg-green-500/20 text-green-300",
@@ -7,10 +7,10 @@ const skillColors: Record<string, string> = {
   EXPERIENCED: "bg-amber-500/20 text-amber-300",
 };
 
-export default function PostCard({ post }: { post: Post }) {
+export default function PostCard({ post }: { post: PostDetail }) {
   return (
     <Link href={`/post/${post.id}`} className="block bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden hover:bg-white/[0.06] hover:border-green-500/25 hover:-translate-y-1 transition group">
-      <div className="aspect-[4/3] bg-black/40 overflow-hidden">
+      <div className="aspect-[4/3] bg-black/40 overflow-hidden relative">
         {post.mediaType === "image" ? (
           <img src={post.mediaUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
         ) : (
@@ -18,6 +18,17 @@ export default function PostCard({ post }: { post: Post }) {
             <span className="text-5xl text-white/40">▶</span>
           </div>
         )}
+        {/* Engagement overlay */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex gap-4">
+          <div className="flex items-center gap-1 text-sm">
+            <span className="text-red-400">♥</span>
+            <span>{post.likeCount}</span>
+          </div>
+          <div className="flex items-center gap-1 text-sm">
+            <span>💬</span>
+            <span>{post.commentCount}</span>
+          </div>
+        </div>
       </div>
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
